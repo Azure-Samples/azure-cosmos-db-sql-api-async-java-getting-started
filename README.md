@@ -42,4 +42,4 @@ The code included in this sample is intended to get you quickly started with a J
 - [Azure Cosmos DB](https://docs.microsoft.com/azure/cosmos-db/introduction)
 - [Azure Cosmos DB : DocumentDB API](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-introduction)
 - [Azure Cosmos DB Async Java SDK Github](https://github.com/Azure/azure-cosmosdb-java)
-- [Azure Cosmos DB Async JavaDoc](https://azure.github.io/azure-cosmosdb-java)
+- [Azure Cosmos DB Async Java SDK JavaDoc](https://azure.github.io/azure-cosmosdb-java)
