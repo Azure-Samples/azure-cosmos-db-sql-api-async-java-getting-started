@@ -26,6 +26,7 @@ package com.microsoft.azure.cosmosdb.sample;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import com.microsoft.azure.cosmosdb.ConnectionPolicy;
 import com.microsoft.azure.cosmosdb.ConsistencyLevel;
@@ -53,9 +54,6 @@ public class Main {
      * 
      * @param args
      *            command line arguments
-     * @throws DocumentClientException
-     *             exception
-     * @throws IOException 
      */
     public static void main(String[] args) {
 
@@ -96,20 +94,29 @@ public class Main {
 
         createFamiliesAndWaitForCompletion(familiesToCreate);
 
-
         familiesToCreate = new ArrayList<>();
         familiesToCreate.add(Families.getJohnsonFamilyDocument());
         familiesToCreate.add(Families.getSmithFamilyDocument());
 
+        CountDownLatch createDocumentsCompletionLatch = new CountDownLatch(1);
+
         System.out.println("create documents async and registering listener for completion");
-        createFamiliesAsyncAndRegisterListener(familiesToCreate);
+        createFamiliesAsyncAndRegisterListener(familiesToCreate, createDocumentsCompletionLatch);
+        
+        CountDownLatch queryCompletionLatch = new CountDownLatch(1);
 
         System.out.println("query documents async and registering listener for result");
-        executeSimpleQueryAsyncAndRegisterListenerForResult();
+        executeSimpleQueryAsyncAndRegisterListenerForResult(queryCompletionLatch);
 
-        // just wait till async work finish
-        Thread.sleep(10000);
+        // as createFamiliesAsyncAndRegisterListener starts the operation in background
+        // and only registers a listener, we used the createDocumentsCompletionLatch
+        // to ensure we wait for the completion
+        createDocumentsCompletionLatch.await();
 
+        // as executeSimpleQueryAsyncAndRegisterListenerForResult starts the operation in background
+        // and only registers a listener, we used the queryCompletionLatch
+        // to ensure we wait for the completion
+        queryCompletionLatch.await();
     }
 
     private void createDatabase() throws Exception {
@@ -162,7 +169,7 @@ public class Main {
         writeToConsoleAndPromptToContinue("Created collection " + collectionName);
     }
 
-    private void createFamiliesAsyncAndRegisterListener(List<Family> families) throws Exception {
+    private void createFamiliesAsyncAndRegisterListener(List<Family> families, CountDownLatch completionLatch) throws Exception {
 
         String collectionLink = String.format("/dbs/%s/colls/%s", databaseName, collectionName);
 
@@ -176,12 +183,23 @@ public class Main {
         Observable.merge(createDocumentsOBs)
         .map(ResourceResponse::getRequestCharge)
         .reduce((sum, value) -> sum + value)
-        .subscribe(totalRequestCharge -> {
-            // this will get print out when completed
-            System.out.println("total charge for creating documents is "
-                    + totalRequestCharge);
-        });
+        .subscribe(
+                totalRequestCharge -> {
+                    // this will get print out when completed
+                    System.out.println("total charge for creating documents is "
+                            + totalRequestCharge);
+                },
 
+                // terminal error signal
+                e -> {
+                    e.printStackTrace();
+                    completionLatch.countDown();
+                },
+
+                // terminal completion signal
+                () -> {
+                    completionLatch.countDown();
+                });
     }
 
     private void createFamiliesAndWaitForCompletion(List<Family> families) throws Exception {
@@ -205,7 +223,7 @@ public class Main {
                 totalRequestCharge));
     }
 
-    private void executeSimpleQueryAsyncAndRegisterListenerForResult() {
+    private void executeSimpleQueryAsyncAndRegisterListenerForResult(CountDownLatch completionLatch) {
         // Set some common query options
         FeedOptions queryOptions = new FeedOptions();
         queryOptions.setMaxItemCount(100);
@@ -221,6 +239,16 @@ public class Main {
                     System.out.println("Got a page of query result with " +
                             queryResultPage.getResults().size() + " document(s)"
                             + " and request charge of " + queryResultPage.getRequestCharge());
+                },
+                // terminal error signal
+                e -> {
+                    e.printStackTrace();
+                    completionLatch.countDown();
+                },
+
+                // terminal completion signal
+                () -> {
+                    completionLatch.countDown();
                 });
     }
 
