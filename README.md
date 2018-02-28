@@ -15,11 +15,23 @@ Azure Cosmos DB is a globally distributed multi-model database. One of the suppo
 
 ### Quickstart
 
-* Then, clone this repository using `git clone https://github.com/Azure-Samples/azure-cosmos-db-sql-api-async-java-getting-started.git`
+* Then, clone this repository using
 
-* From a command prompt or shell, run `mvn package` to compile and resolve dependencies.
+```bash
+git clone https://github.com/Azure-Samples/azure-cosmos-db-sql-api-async-java-getting-started.git
+```
 
-* From a command prompt or shell, run `mvn exec:java -DACCOUNT_HOST=YOUR_COSMOS_DB_HOSTNAME -DACCOUNT_KEY=YOUR_COSMOS_DB_MASTER_KEY` to run the application.
+* From a command prompt or shell, run the following command to compile and resolve dependencies.
+
+```bash
+mvn package
+```
+
+* From a command prompt or shell, run the following command to run the application.
+
+```bash
+mvn exec:java -DACCOUNT_HOST=YOUR_COSMOS_DB_HOSTNAME -DACCOUNT_KEY=YOUR_COSMOS_DB_MASTER_KEY
+```
 
 ## About the code
 
