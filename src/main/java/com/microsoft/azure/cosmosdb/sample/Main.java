@@ -75,6 +75,8 @@ public class Main {
 
     private void getStartedDemo() throws Exception {
 
+        System.out.println("Using Azure Cosmos DB endpoint: " + AccountSettings.HOST);
+
         client = new AsyncDocumentClient.Builder()
                 .withServiceEndpoint(AccountSettings.HOST)
                 .withMasterKey(AccountSettings.MASTER_KEY)
@@ -121,12 +123,12 @@ public class Main {
         database.setId(databaseName);
 
         Observable<ResourceResponse<Database>> 
-            resourceResponseObs = client.createDatabase(database, null);
+        resourceResponseObs = client.createDatabase(database, null);
 
         resourceResponseObs = resourceResponseObs.onErrorResumeNext(
                 e -> {
                     // in case of error check if the failure is due to a database with same name exists
-                    
+
                     if (e instanceof DocumentClientException) {
                         DocumentClientException de = (DocumentClientException) e;
                         // if database 
