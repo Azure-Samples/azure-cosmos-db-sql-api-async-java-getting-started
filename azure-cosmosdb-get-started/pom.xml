@@ -4,6 +4,9 @@
   <artifactId>azure-cosmosdb-get-started</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <name>Get Started With Azure Cosmos DB Async Java SDK</name>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
   <build>
     <plugins>
       <plugin>
@@ -40,7 +43,7 @@
     <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-cosmosdb</artifactId>
-      <version>LATEST</version>
+      <version>1.0.0</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
