@@ -24,6 +24,7 @@ git clone https://github.com/Azure-Samples/azure-cosmos-db-sql-api-async-java-ge
 * From a command prompt or shell, run the following command to compile and resolve dependencies.
 
 ```bash
+cd azure-cosmosdb-get-started
 mvn package
 ```
 
