@@ -131,7 +131,9 @@ public class Main {
 
         Observable<ResourceResponse<Database>> databaseExistenceObs = 
                 databaseReadObs
-                .doOnNext(x -> System.out.println("database already exists"))
+                .doOnNext(x -> {
+                    System.out.println("database " + databaseName + " already exists.");
+                })
                 .onErrorResumeNext(
                         e -> {
                             // if the database doesn't already exists
@@ -141,8 +143,8 @@ public class Main {
                                 // if database 
                                 if (de.getStatusCode() == 404) {
                                     // if the database doesn't exist, create it.
-                                    System.out.println("database doesn't existed,"
-                                            + " going create it");
+                                    System.out.println("database " + databaseName + " doesn't existed,"
+                                            + " creating it...");
 
                                     Database dbDefinition = new Database();
                                     dbDefinition.setId(databaseName);
@@ -153,7 +155,7 @@ public class Main {
 
                             // some unexpected failure in reading database happened.
                             // pass the error up.
-                            System.err.println("Reading database failed");
+                            System.err.println("Reading database " + databaseName + " failed.");
                             return Observable.error(e);     
                         });
 
@@ -161,13 +163,13 @@ public class Main {
         // wait for completion
         databaseExistenceObs.toCompletable().await();
 
-        System.out.println("Checking database completed!\n");
+        System.out.println("Checking database " + databaseName + " completed!\n");
     }
 
     private void createDocumentCollectionIfNotExists() throws Exception {
         writeToConsoleAndPromptToContinue(
                 "Check if collection " + collectionName + " exists.");
-        
+
         // query for a collection with a given id
         // if it exists nothing else to be done
         // if the collection doesn't exist, create it.
@@ -184,17 +186,17 @@ public class Main {
                 // if there is no matching collection create the collection.
                 DocumentCollection collection = new DocumentCollection();
                 collection.setId(collectionName);
-                System.out.println("Creating collection");
+                System.out.println("Creating collection " + collectionName);
 
                 return client.createCollection(databaseLink, collection, null);
             } else {
                 // collection already exists, nothing else to be done.
-                System.out.println("Collection already exists");
+                System.out.println("Collection " + collectionName + "already exists");
                 return Observable.empty();
             }
         }).toCompletable().await();
-        
-        System.out.println("Checking collection completed!\n");
+
+        System.out.println("Checking collection " + collectionName + " completed!\n");
     }
 
     private void createFamiliesAsyncAndRegisterListener(List<Family> families, CountDownLatch completionLatch) throws Exception {
