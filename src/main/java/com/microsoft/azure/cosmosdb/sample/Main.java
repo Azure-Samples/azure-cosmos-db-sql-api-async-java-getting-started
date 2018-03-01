@@ -178,7 +178,6 @@ public class Main {
                 new SqlQuerySpec("SELECT * FROM r where r.id = @id", 
                         new SqlParameterCollection(
                                 new SqlParameter("@id", collectionName))), null)
-
         .single() // we know there is only single page of result (empty or with a match)
         .flatMap(page -> {
             if (page.getResults().isEmpty()) {
