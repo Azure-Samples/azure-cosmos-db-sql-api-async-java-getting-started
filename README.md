@@ -1,57 +1,45 @@
-# Project Name
+# Java app using Azure Cosmos DB Async Java SDK
 
-(short, 1-3 sentenced, description of the project)
-
-## Features
-
-This project framework provides the following features:
-
-* Feature 1
-* Feature 2
-* ...
+Azure Cosmos DB is a globally distributed multi-model database. One of the supported APIs is the Document API, which provides a JSON document model with SQL querying and JavaScript procedural logic. This sample shows you how to use the Azure Cosmos DB with the DocumentDB API to store and access data from a Java application.
 
 ## Getting Started
 
 ### Prerequisites
 
-(ideally very short, if any)
+* Before you can run this sample, you must have the following prerequisites:
 
-- OS
-- Library version
-- ...
+   * An active Azure account. If you don't have one, you can sign up for a [free account](https://azure.microsoft.com/free/). Alternatively, you can use the [Azure Cosmos DB Emulator](https://azure.microsoft.com/documentation/articles/documentdb-nosql-local-emulator) for this tutorial. As emulator https certificate is self signed, you need to import its certificate to java trusted cert store as [explained here](https://docs.microsoft.com/en-us/azure/cosmos-db/local-emulator-export-ssl-certificates).
 
-### Installation
-
-(ideally very short)
-
-- npm install [package name]
-- mvn install
-- ...
+   * JDK 1.8+
+   * Maven
 
 ### Quickstart
-(Add steps to get up and running quickly)
 
-1. git clone [repository clone url]
-2. cd [respository name]
-3. ...
+* Then, clone this repository using
 
+```bash
+git clone https://github.com/Azure-Samples/azure-cosmos-db-sql-api-async-java-getting-started.git
+```
 
-## Demo
+* From a command prompt or shell, run the following command to compile and resolve dependencies.
 
-A demo app is included to show how to use the project.
+```bash
+mvn package
+```
 
-To run the demo, follow these steps:
+* From a command prompt or shell, run the following command to run the application.
 
-(Add steps to start up the demo)
+```bash
+mvn exec:java -DACCOUNT_HOST=YOUR_COSMOS_DB_HOSTNAME -DACCOUNT_KEY=YOUR_COSMOS_DB_MASTER_KEY
+```
 
-1.
-2.
-3.
+## About the code
 
-## Resources
+The code included in this sample is intended to get you quickly started with a Java application that connects to Azure Cosmos DB with the DocumentDB API.
 
-(Any additional resources or related projects)
+## More information
 
-- Link to supporting information
-- Link to similar sample
-- ...
+- [Azure Cosmos DB](https://docs.microsoft.com/azure/cosmos-db/introduction)
+- [Azure Cosmos DB : DocumentDB API](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-introduction)
+- [Azure Cosmos DB Async Java SDK Github](https://github.com/Azure/azure-cosmosdb-java)
+- [Azure Cosmos DB Async Java SDK JavaDoc](https://azure.github.io/azure-cosmosdb-java)
