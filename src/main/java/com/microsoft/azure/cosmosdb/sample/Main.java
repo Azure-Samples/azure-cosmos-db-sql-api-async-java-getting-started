@@ -38,6 +38,9 @@ import com.microsoft.azure.cosmosdb.FeedOptions;
 import com.microsoft.azure.cosmosdb.FeedResponse;
 import com.microsoft.azure.cosmosdb.RequestOptions;
 import com.microsoft.azure.cosmosdb.ResourceResponse;
+import com.microsoft.azure.cosmosdb.SqlParameter;
+import com.microsoft.azure.cosmosdb.SqlParameterCollection;
+import com.microsoft.azure.cosmosdb.SqlQuerySpec;
 import com.microsoft.azure.cosmosdb.rx.AsyncDocumentClient;
 
 import rx.Observable;
@@ -53,7 +56,6 @@ public class Main {
      * Run a Hello DocumentDB console application.
      * 
      * @param args
-     *            command line arguments
      */
     public static void main(String[] args) {
 
@@ -72,7 +74,6 @@ public class Main {
     }
 
     private void getStartedDemo() throws Exception {
-
         System.out.println("Using Azure Cosmos DB endpoint: " + AccountSettings.HOST);
 
         client = new AsyncDocumentClient.Builder()
@@ -82,8 +83,8 @@ public class Main {
                 .withConsistencyLevel(ConsistencyLevel.Session)
                 .build();
 
-        this.createDatabase();
-        this.createDocumentCollection();
+        this.createDatabaseIfNotExists();
+        this.createDocumentCollectionIfNotExists();
 
         Family andersenFamily = Families.getAndersenFamilyDocument();
         Family wakefieldFamily = Families.getWakefieldFamilyDocument();
@@ -100,12 +101,12 @@ public class Main {
 
         CountDownLatch createDocumentsCompletionLatch = new CountDownLatch(1);
 
-        System.out.println("create documents async and registering listener for completion");
+        System.out.println("Creating documents async and registering listener for the completion.");
         createFamiliesAsyncAndRegisterListener(familiesToCreate, createDocumentsCompletionLatch);
-        
+
         CountDownLatch queryCompletionLatch = new CountDownLatch(1);
 
-        System.out.println("query documents async and registering listener for result");
+        System.out.println("Querying documents async and registering listener for the result.");
         executeSimpleQueryAsyncAndRegisterListenerForResult(queryCompletionLatch);
 
         // as createFamiliesAsyncAndRegisterListener starts the operation in background
@@ -119,54 +120,82 @@ public class Main {
         queryCompletionLatch.await();
     }
 
-    private void createDatabase() throws Exception {
+    private void createDatabaseIfNotExists() throws Exception {
+        writeToConsoleAndPromptToContinue(
+                "Check if database " + databaseName + " exists.");
+
         String databaseLink = String.format("/dbs/%s", databaseName);
 
-        // Attempts to create a database with name database name
-        // if it already exists will delete it
-        // then re-create it
+        Observable<ResourceResponse<Database>> databaseReadObs = 
+                client.readDatabase(databaseLink, null);
 
-        Database database = new Database();
-        database.setId(databaseName);
+        Observable<ResourceResponse<Database>> databaseExistenceObs = 
+                databaseReadObs
+                .doOnNext(x -> System.out.println("database already exists"))
+                .onErrorResumeNext(
+                        e -> {
+                            // if the database doesn't already exists
+                            // readDatabase() will result in 404 error
+                            if (e instanceof DocumentClientException) {
+                                DocumentClientException de = (DocumentClientException) e;
+                                // if database 
+                                if (de.getStatusCode() == 404) {
+                                    // if the database doesn't exist, create it.
+                                    System.out.println("database doesn't existed,"
+                                            + " going create it");
 
-        Observable<ResourceResponse<Database>> 
-        resourceResponseObs = client.createDatabase(database, null);
+                                    Database dbDefinition = new Database();
+                                    dbDefinition.setId(databaseName);
 
-        resourceResponseObs = resourceResponseObs.onErrorResumeNext(
-                e -> {
-                    // in case of error check if the failure is due to a database with same name exists
+                                    return client.createDatabase(dbDefinition, null);
+                                }
+                            }
 
-                    if (e instanceof DocumentClientException) {
-                        DocumentClientException de = (DocumentClientException) e;
-                        // if database 
-                        if (de.getStatusCode() == 409) {
-                            System.out.println("database already existed,"
-                                    + " deleting and recreating it");
-                            return client.deleteDatabase(databaseLink, null)
-                                    .concatWith(
-                                            client.createDatabase(database, null));
-                        }
-                    }
+                            // some unexpected failure in reading database happened.
+                            // pass the error up.
+                            System.err.println("Reading database failed");
+                            return Observable.error(e);     
+                        });
 
-                    // else
-                    // unexpected failure
-                    return Observable.error(e);
-                });
 
-        resourceResponseObs.toCompletable().await();
+        // wait for completion
+        databaseExistenceObs.toCompletable().await();
 
-        writeToConsoleAndPromptToContinue("Created database " + databaseName);
+        System.out.println("Checking database completed!\n");
     }
 
-    private void createDocumentCollection() throws Exception {
+    private void createDocumentCollectionIfNotExists() throws Exception {
+        writeToConsoleAndPromptToContinue(
+                "Check if collection " + collectionName + " exists.");
+        
+        // query for a collection with a given id
+        // if it exists nothing else to be done
+        // if the collection doesn't exist, create it.
+
         String databaseLink = String.format("/dbs/%s", databaseName);
 
-        DocumentCollection collection = new DocumentCollection();
-        collection.setId(collectionName);
-        Observable<ResourceResponse<DocumentCollection>> obs = client.createCollection(databaseLink, collection, null);
+        client.queryCollections(databaseLink, 
+                new SqlQuerySpec("SELECT * FROM r where r.id = @id", 
+                        new SqlParameterCollection(
+                                new SqlParameter("@id", collectionName))), null)
 
-        obs.toCompletable().await();
-        writeToConsoleAndPromptToContinue("Created collection " + collectionName);
+        .single() // we know there is only single page of result (empty or with a match)
+        .flatMap(page -> {
+            if (page.getResults().isEmpty()) {
+                // if there is no matching collection create the collection.
+                DocumentCollection collection = new DocumentCollection();
+                collection.setId(collectionName);
+                System.out.println("Creating collection");
+
+                return client.createCollection(databaseLink, collection, null);
+            } else {
+                // collection already exists, nothing else to be done.
+                System.out.println("Collection already exists");
+                return Observable.empty();
+            }
+        }).toCompletable().await();
+        
+        System.out.println("Checking collection completed!\n");
     }
 
     private void createFamiliesAsyncAndRegisterListener(List<Family> families, CountDownLatch completionLatch) throws Exception {
