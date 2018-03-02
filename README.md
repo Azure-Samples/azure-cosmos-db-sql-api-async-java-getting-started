@@ -1,6 +1,6 @@
 # Java app using Azure Cosmos DB Async Java SDK
 
-Azure Cosmos DB is a globally distributed multi-model database. One of the supported APIs is the Document API, which provides a JSON document model with SQL querying and JavaScript procedural logic. This sample shows you how to use the Azure Cosmos DB with the DocumentDB API to store and access data from a Java application.
+Azure Cosmos DB is a globally distributed multi-model database. One of the supported APIs is the SQL API, which provides a JSON document model with SQL querying and JavaScript procedural logic. This sample shows you how to use the Azure Cosmos DB with the SQL API to store and access data from a Java application.
 
 ## Getting Started
 
@@ -24,6 +24,7 @@ git clone https://github.com/Azure-Samples/azure-cosmos-db-sql-api-async-java-ge
 * From a command prompt or shell, run the following command to compile and resolve dependencies.
 
 ```bash
+cd azure-cosmos-db-sql-api-async-java-getting-started
 cd azure-cosmosdb-get-started
 mvn package
 ```
@@ -36,11 +37,11 @@ mvn exec:java -DACCOUNT_HOST=YOUR_COSMOS_DB_HOSTNAME -DACCOUNT_KEY=YOUR_COSMOS_D
 
 ## About the code
 
-The code included in this sample is intended to get you quickly started with a Java application that connects to Azure Cosmos DB with the DocumentDB API.
+The code included in this sample is intended to get you quickly started with a Java application that connects to Azure Cosmos DB with the SQL API.
 
 ## More information
 
 - [Azure Cosmos DB](https://docs.microsoft.com/azure/cosmos-db/introduction)
-- [Azure Cosmos DB : DocumentDB API](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-introduction)
-- [Azure Cosmos DB Async Java SDK Github](https://github.com/Azure/azure-cosmosdb-java)
-- [Azure Cosmos DB Async Java SDK JavaDoc](https://azure.github.io/azure-cosmosdb-java)
+- [Azure Cosmos DB : SQL API](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-introduction)
+- [Async Java SDK Github for SQL API of Azure Cosmos DB](https://github.com/Azure/azure-cosmosdb-java)
+- [Async Java SDK JavaDoc for SQL API of Azure Cosmos DB](https://azure.github.io/azure-cosmosdb-java)
