@@ -1,3 +1,9 @@
+---
+services: Cosmos DB
+platforms: java
+author: moderakh
+---
+
 # Java app using Azure Cosmos DB Async Java SDK
 
 Azure Cosmos DB is a globally distributed multi-model database. One of the supported APIs is the SQL API, which provides a JSON document model with SQL querying and JavaScript procedural logic. This sample shows you how to use the Azure Cosmos DB with the SQL API to store and access data from a Java application.
