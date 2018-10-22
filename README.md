@@ -1,5 +1,5 @@
 ---
-services: Cosmos DB
+services: cosmos-db
 platforms: java
 author: moderakh
 ---
