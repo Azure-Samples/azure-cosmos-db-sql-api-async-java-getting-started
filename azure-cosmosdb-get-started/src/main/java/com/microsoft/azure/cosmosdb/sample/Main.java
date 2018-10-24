@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
     private final ExecutorService executorService;
@@ -59,7 +60,7 @@ public class Main {
 
     public Main() {
         executorService = Executors.newFixedThreadPool(100);
-        // The SDK uses netty library for doing async IO operations, and the operations are performed the netty io threads.
+        // The SDK uses netty library for doing async IO operations. The IO operations are performed on the netty io threads.
         // The number of IO netty threads are limited; it is the same as the number of CPU cores.
 
         // The app should avoid doing anything which takes a lot of time from IO netty thread.
@@ -70,12 +71,11 @@ public class Main {
         //  * deadlock
 
         // The app code will receive the data from Azure Cosmos DB on the netty IO thread.
-        // The app should ensure the user's blocking call or computationally/IO heavy work after receiving data
-        // from Azure Cosmos DB is performed on a custom thread managed by the user (not the SDK netty IO threads).
+        // The app should ensure the user's computationally/IO heavy work after receiving data
+        // from Azure Cosmos DB is performed on a custom thread managed by the user (not on the SDK netty IO thread).
         //
-        // If you are doing blocking calls or heavy work, provide your own scheduler to switch thread.
-        // for example you can do this:
-        // client.createDocument(.).observeOn(userCustomScheduler).toBlocking().single();
+        // If you are doing heavy work after receiving the result from the SDK,
+        // you should provide your own scheduler to switch thread.
 
         // the following scheduler is used for switching from netty thread to user app thread.
         scheduler = Schedulers.from(executorService);
@@ -92,7 +92,6 @@ public class Main {
      * @param args command line args.
      */
     public static void main(String[] args) {
-
         Main p = new Main();
 
         try {
@@ -196,7 +195,7 @@ public class Main {
         // wait for completion,
         // as waiting for completion is a blocking call try to
         // provide your own scheduler to avoid stealing netty io threads.
-        databaseExistenceObs.toCompletable().observeOn(scheduler).await();
+        databaseExistenceObs.toCompletable().await();
 
         System.out.println("Checking database " + databaseName + " completed!\n");
     }
@@ -229,7 +228,7 @@ public class Main {
                         System.out.println("Collection " + collectionName + "already exists");
                         return Observable.empty();
                     }
-                }).toCompletable().observeOn(scheduler).await();
+                }).toCompletable().await();
 
         System.out.println("Checking collection " + collectionName + " completed!\n");
     }
@@ -268,7 +267,6 @@ public class Main {
     }
 
     private void createFamiliesAndWaitForCompletion(List<Family> families) throws Exception {
-
         String collectionLink = String.format("/dbs/%s/colls/%s", databaseName, collectionName);
 
         List<Observable<ResourceResponse<Document>>> createDocumentsOBs = new ArrayList<>();
@@ -280,12 +278,30 @@ public class Main {
 
         Double totalRequestCharge = Observable.merge(createDocumentsOBs)
                 .map(ResourceResponse::getRequestCharge)
+                .observeOn(scheduler) // the scheduler will be used for the following work
+                .map(charge -> {
+                    // as we don't want to run heavyWork() on netty IO thread, we provide the custom scheduler
+                    // for switching from netty IO thread to user thread.
+                    heavyWork();
+                    return charge;
+                })
                 .reduce((sum, value) -> sum + value)
                 .toBlocking().single();
 
         writeToConsoleAndPromptToContinue(String.format("Created %d documents with total request charge of %.2f",
                 families.size(),
                 totalRequestCharge));
+    }
+
+    private void heavyWork() {
+        // I may do a lot of IO work: e.g., writing to log files
+        // a lot of computational work
+        // or may do Thread.sleep()
+
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (Exception e) {
+        }
     }
 
     private void executeSimpleQueryAsyncAndRegisterListenerForResult(CountDownLatch completionLatch) {
@@ -299,22 +315,28 @@ public class Main {
                 client.queryDocuments(collectionLink,
                         "SELECT * FROM Family WHERE Family.lastName = 'Andersen'", queryOptions);
 
-        queryObservable.subscribe(
-                queryResultPage -> {
-                    System.out.println("Got a page of query result with " +
-                            queryResultPage.getResults().size() + " document(s)"
-                            + " and request charge of " + queryResultPage.getRequestCharge());
-                },
-                // terminal error signal
-                e -> {
-                    e.printStackTrace();
-                    completionLatch.countDown();
-                },
+        queryObservable
+                .observeOn(scheduler)
+                .subscribe(
+                        queryResultPage -> {
+                            // we want to make sure heavyWork() doesn't block any of netty IO threads
+                            // so we use observeOn(scheduler) to switch from the netty thread to user's thread.
+                            heavyWork();
 
-                // terminal completion signal
-                () -> {
-                    completionLatch.countDown();
-                });
+                            System.out.println("Got a page of query result with " +
+                                    queryResultPage.getResults().size() + " document(s)"
+                                    + " and request charge of " + queryResultPage.getRequestCharge());
+                        },
+                        // terminal error signal
+                        e -> {
+                            e.printStackTrace();
+                            completionLatch.countDown();
+                        },
+
+                        // terminal completion signal
+                        () -> {
+                            completionLatch.countDown();
+                        });
     }
 
     private void writeToConsoleAndPromptToContinue(String text) throws IOException {
