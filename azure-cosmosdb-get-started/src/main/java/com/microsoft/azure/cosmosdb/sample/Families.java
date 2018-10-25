@@ -26,7 +26,7 @@ public class Families {
  
     public static Family getAndersenFamilyDocument() {
         Family andersenFamily = new Family();
-        andersenFamily.setId("Andersen" + System.currentTimeMillis());
+        andersenFamily.setId("Andersen-" + System.currentTimeMillis());
         andersenFamily.setLastName("Andersen");
 
         Parent parent1 = new Parent();
@@ -61,7 +61,7 @@ public class Families {
 
     public static Family getWakefieldFamilyDocument() {
         Family wakefieldFamily = new Family();
-        wakefieldFamily.setId("Wakefield" + System.currentTimeMillis());
+        wakefieldFamily.setId("Wakefield-" + System.currentTimeMillis());
         wakefieldFamily.setLastName("Wakefield");
 
         Parent parent1 = new Parent();
@@ -108,7 +108,7 @@ public class Families {
 
     public static Family getJohnsonFamilyDocument() {
         Family andersenFamily = new Family();
-        andersenFamily.setId("Johnson" + System.currentTimeMillis());
+        andersenFamily.setId("Johnson-" + System.currentTimeMillis());
         andersenFamily.setLastName("Johnson");
 
         Parent parent1 = new Parent();
@@ -122,7 +122,7 @@ public class Families {
     
     public static Family getSmithFamilyDocument() {
         Family andersenFamily = new Family();
-        andersenFamily.setId("Smith" + System.currentTimeMillis());
+        andersenFamily.setId("Smith-" + System.currentTimeMillis());
         andersenFamily.setLastName("Smith");
 
         Parent parent1 = new Parent();

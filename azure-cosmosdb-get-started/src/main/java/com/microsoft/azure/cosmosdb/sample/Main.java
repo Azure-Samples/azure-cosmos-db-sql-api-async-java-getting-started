@@ -48,6 +48,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class Main {
     private final ExecutorService executorService;
@@ -96,13 +97,14 @@ public class Main {
 
         try {
             p.getStartedDemo();
-            System.out.println(String.format("Demo complete, please hold while resources are deleted"));
+            System.out.println(String.format("Demo complete, please hold while resources are released"));
         } catch (Exception e) {
             System.err.println(String.format("DocumentDB GetStarted failed with %s", e));
         } finally {
             System.out.println("close the client");
             p.close();
         }
+        System.exit(0);
     }
 
     private void getStartedDemo() throws Exception {
@@ -112,7 +114,7 @@ public class Main {
                 .withServiceEndpoint(AccountSettings.HOST)
                 .withMasterKeyOrResourceToken(AccountSettings.MASTER_KEY)
                 .withConnectionPolicy(ConnectionPolicy.GetDefault())
-                .withConsistencyLevel(ConsistencyLevel.Session)
+                .withConsistencyLevel(ConsistencyLevel.Eventual)
                 .build();
 
         createDatabaseIfNotExists();
@@ -307,25 +309,29 @@ public class Main {
     private void executeSimpleQueryAsyncAndRegisterListenerForResult(CountDownLatch completionLatch) {
         // Set some common query options
         FeedOptions queryOptions = new FeedOptions();
-        queryOptions.setMaxItemCount(100);
+        queryOptions.setMaxItemCount(10);
         queryOptions.setEnableCrossPartitionQuery(true);
 
         String collectionLink = String.format("/dbs/%s/colls/%s", databaseName, collectionName);
         Observable<FeedResponse<Document>> queryObservable =
                 client.queryDocuments(collectionLink,
-                        "SELECT * FROM Family WHERE Family.lastName = 'Andersen'", queryOptions);
+                        "SELECT * FROM Family WHERE Family.lastName != 'Andersen'", queryOptions);
 
         queryObservable
                 .observeOn(scheduler)
                 .subscribe(
-                        queryResultPage -> {
+                        page -> {
                             // we want to make sure heavyWork() doesn't block any of netty IO threads
                             // so we use observeOn(scheduler) to switch from the netty thread to user's thread.
                             heavyWork();
 
                             System.out.println("Got a page of query result with " +
-                                    queryResultPage.getResults().size() + " document(s)"
-                                    + " and request charge of " + queryResultPage.getRequestCharge());
+                                    page.getResults().size() + " document(s)"
+                                    + " and request charge of " + page.getRequestCharge());
+
+
+                            System.out.println("Document Ids " + page.getResults().stream().map(d -> d.getId())
+                                    .collect(Collectors.toList()));
                         },
                         // terminal error signal
                         e -> {
