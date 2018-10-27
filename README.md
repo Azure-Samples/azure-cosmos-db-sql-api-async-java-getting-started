@@ -32,7 +32,7 @@ git clone https://github.com/Azure-Samples/azure-cosmos-db-sql-api-async-java-ge
 ```bash
 cd azure-cosmos-db-sql-api-async-java-getting-started
 cd azure-cosmosdb-get-started
-mvn package
+mvn clean package
 ```
 
 * From a command prompt or shell, run the following command to run the application.
