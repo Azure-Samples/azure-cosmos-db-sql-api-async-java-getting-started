@@ -23,24 +23,6 @@
 
 package com.microsoft.azure.cosmosdb.sample;
 
-import com.microsoft.azure.cosmosdb.ConnectionPolicy;
-import com.microsoft.azure.cosmosdb.ConsistencyLevel;
-import com.microsoft.azure.cosmosdb.Database;
-import com.microsoft.azure.cosmosdb.Document;
-import com.microsoft.azure.cosmosdb.DocumentClientException;
-import com.microsoft.azure.cosmosdb.DocumentCollection;
-import com.microsoft.azure.cosmosdb.FeedOptions;
-import com.microsoft.azure.cosmosdb.FeedResponse;
-import com.microsoft.azure.cosmosdb.RequestOptions;
-import com.microsoft.azure.cosmosdb.ResourceResponse;
-import com.microsoft.azure.cosmosdb.SqlParameter;
-import com.microsoft.azure.cosmosdb.SqlParameterCollection;
-import com.microsoft.azure.cosmosdb.SqlQuerySpec;
-import com.microsoft.azure.cosmosdb.rx.AsyncDocumentClient;
-import rx.Observable;
-import rx.Scheduler;
-import rx.schedulers.Schedulers;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +31,25 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import com.azure.cosmos.ConnectionPolicy;
+import com.azure.cosmos.ConsistencyLevel;
+import com.azure.cosmos.CosmosClientException;
+import com.azure.cosmos.FeedOptions;
+import com.azure.cosmos.FeedResponse;
+import com.azure.cosmos.SqlParameter;
+import com.azure.cosmos.SqlParameterList;
+import com.azure.cosmos.SqlQuerySpec;
+import com.azure.cosmos.internal.AsyncDocumentClient;
+import com.azure.cosmos.internal.Database;
+import com.azure.cosmos.internal.Document;
+import com.azure.cosmos.internal.DocumentCollection;
+import com.azure.cosmos.internal.RequestOptions;
+import com.azure.cosmos.internal.ResourceResponse;
+
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 public class Main {
     private final ExecutorService executorService;
@@ -79,7 +80,7 @@ public class Main {
         // you should provide your own scheduler to switch thread.
 
         // the following scheduler is used for switching from netty thread to user app thread.
-        scheduler = Schedulers.from(executorService);
+        scheduler = Schedulers.fromExecutor(executorService);
     }
 
     public void close() {
@@ -113,9 +114,8 @@ public class Main {
         client = new AsyncDocumentClient.Builder()
                 .withServiceEndpoint(AccountSettings.HOST)
                 .withMasterKeyOrResourceToken(AccountSettings.MASTER_KEY)
-                .withConnectionPolicy(ConnectionPolicy.GetDefault())
-                .withConsistencyLevel(ConsistencyLevel.Eventual)
-                .build();
+                .withConnectionPolicy(ConnectionPolicy.getDefaultPolicy())
+                .withConsistencyLevel(ConsistencyLevel.EVENTUAL).build();
 
         createDatabaseIfNotExists();
         createDocumentCollectionIfNotExists();
@@ -160,44 +160,42 @@ public class Main {
 
         String databaseLink = String.format("/dbs/%s", databaseName);
 
-        Observable<ResourceResponse<Database>> databaseReadObs =
-                client.readDatabase(databaseLink, null);
+        Flux<ResourceResponse<Database>> databaseReadObs = 
+            client.readDatabase(databaseLink, null);
 
-        Observable<ResourceResponse<Database>> databaseExistenceObs =
-                databaseReadObs
-                        .doOnNext(x -> {
-                            System.out.println("database " + databaseName + " already exists.");
-                        })
-                        .onErrorResumeNext(
-                                e -> {
-                                    // if the database doesn't already exists
-                                    // readDatabase() will result in 404 error
-                                    if (e instanceof DocumentClientException) {
-                                        DocumentClientException de = (DocumentClientException) e;
-                                        // if database
-                                        if (de.getStatusCode() == 404) {
-                                            // if the database doesn't exist, create it.
-                                            System.out.println("database " + databaseName + " doesn't existed,"
-                                                    + " creating it...");
+            databaseReadObs
+                    .doOnNext(x -> {
+                        System.out.println("database " + databaseName + " already exists.");
+                    })
+                    .onErrorResume(
+                            e -> {
+                                // if the database doesn't already exists
+                                // readDatabase() will result in 404 error
+                                if (e instanceof CosmosClientException) {
+                                    CosmosClientException de = (CosmosClientException) e;
+                                // if database
+                                if (de.getStatusCode() == 404) {
+                                     // if the database doesn't exist, create it.
+                                    System.out.println("database " + databaseName + " doesn't existed," 
+                                            + " creating it...");
 
-                                            Database dbDefinition = new Database();
-                                            dbDefinition.setId(databaseName);
+                                    Database dbDefinition = new Database();
+                                    dbDefinition.setId(databaseName);
 
-                                            return client.createDatabase(dbDefinition, null);
-                                        }
-                                    }
+                                    return client.createDatabase(dbDefinition, null);
+                                }
+                            }
 
-                                    // some unexpected failure in reading database happened.
-                                    // pass the error up.
-                                    System.err.println("Reading database " + databaseName + " failed.");
-                                    return Observable.error(e);
-                                });
-
+                            // some unexpected failure in reading database happened.
+                            // pass the error up.
+                            System.err.println("Reading database " + databaseName + " failed.");
+                            return Flux.error(e);
+                        });
 
         // wait for completion,
         // as waiting for completion is a blocking call try to
         // provide your own scheduler to avoid stealing netty io threads.
-        databaseExistenceObs.toCompletable().await();
+        Thread.sleep(20000);
 
         System.out.println("Checking database " + databaseName + " completed!\n");
     }
@@ -211,26 +209,27 @@ public class Main {
         // if the collection doesn't exist, create it.
 
         String databaseLink = String.format("/dbs/%s", databaseName);
+        
+        SqlParameterList sqlParameterList=new SqlParameterList();
+        sqlParameterList.add(new SqlParameter("@id", collectionName));
 
-        client.queryCollections(databaseLink,
-                new SqlQuerySpec("SELECT * FROM r where r.id = @id",
-                        new SqlParameterCollection(
-                                new SqlParameter("@id", collectionName))), null)
-                .single() // we know there is only single page of result (empty or with a match)
-                .flatMap(page -> {
-                    if (page.getResults().isEmpty()) {
-                        // if there is no matching collection create the collection.
-                        DocumentCollection collection = new DocumentCollection();
-                        collection.setId(collectionName);
-                        System.out.println("Creating collection " + collectionName);
+        FeedResponse<DocumentCollection> feedResponsePages = client.queryCollections(
+                databaseLink,
+                new SqlQuerySpec("SELECT * FROM r where r.id = @id",sqlParameterList),
+                null).single().block();  // we know there is only single page of result (empty or with a match)
+        if (feedResponsePages.getResults().isEmpty()) {
+        // if there is no matching collection create the collection.
+            DocumentCollection collection = new DocumentCollection();
+            collection.setId(collectionName);
+            System.out.println("Creating collection " + collectionName);
+            client.createCollection(databaseLink, collection, null);
+        } else {
+            // collection already exists, nothing else to be done.
+            System.out.println("Collection " + collectionName + "already exists");
+            Flux.empty();
+        }
 
-                        return client.createCollection(databaseLink, collection, null);
-                    } else {
-                        // collection already exists, nothing else to be done.
-                        System.out.println("Collection " + collectionName + "already exists");
-                        return Observable.empty();
-                    }
-                }).toCompletable().await();
+        Thread.sleep(20000);
 
         System.out.println("Checking collection " + collectionName + " completed!\n");
     }
@@ -239,14 +238,14 @@ public class Main {
 
         String collectionLink = String.format("/dbs/%s/colls/%s", databaseName, collectionName);
 
-        List<Observable<ResourceResponse<Document>>> createDocumentsOBs = new ArrayList<>();
+        List<Flux<ResourceResponse<Document>>> createDocumentsOBs = new ArrayList<>();
         for (Family family : families) {
-            Observable<ResourceResponse<Document>> obs = client.createDocument(
+            Flux<ResourceResponse<Document>> obs = client.createDocument(
                     collectionLink, family, new RequestOptions(), true);
             createDocumentsOBs.add(obs);
         }
 
-        Observable.merge(createDocumentsOBs)
+        Flux.merge(createDocumentsOBs)
                 .map(ResourceResponse::getRequestCharge)
                 .reduce((sum, value) -> sum + value)
                 .subscribe(
@@ -271,16 +270,16 @@ public class Main {
     private void createFamiliesAndWaitForCompletion(List<Family> families) throws Exception {
         String collectionLink = String.format("/dbs/%s/colls/%s", databaseName, collectionName);
 
-        List<Observable<ResourceResponse<Document>>> createDocumentsOBs = new ArrayList<>();
+        List<Flux<ResourceResponse<Document>>> createDocumentsOBs = new ArrayList<>();
         for (Family family : families) {
-            Observable<ResourceResponse<Document>> obs = client.createDocument(
+            Flux<ResourceResponse<Document>> obs = client.createDocument(
                     collectionLink, family, new RequestOptions(), true);
             createDocumentsOBs.add(obs);
         }
 
-        Double totalRequestCharge = Observable.merge(createDocumentsOBs)
+        Double totalRequestCharge = Flux.merge(createDocumentsOBs)
                 .map(ResourceResponse::getRequestCharge)
-                .observeOn(scheduler) // the scheduler will be used for the following work
+                .subscribeOn(scheduler) // the scheduler will be used for the following work
                 .map(charge -> {
                     // as we don't want to run heavyWork() on netty IO thread, we provide the custom scheduler
                     // for switching from netty IO thread to user thread.
@@ -288,7 +287,7 @@ public class Main {
                     return charge;
                 })
                 .reduce((sum, value) -> sum + value)
-                .toBlocking().single();
+                .single().block();
 
         writeToConsoleAndPromptToContinue(String.format("Created %d documents with total request charge of %.2f",
                 families.size(),
@@ -303,22 +302,23 @@ public class Main {
         try {
             TimeUnit.SECONDS.sleep(2);
         } catch (Exception e) {
+            System.out.println("MelanieTest: " + e);
         }
     }
 
     private void executeSimpleQueryAsyncAndRegisterListenerForResult(CountDownLatch completionLatch) {
         // Set some common query options
         FeedOptions queryOptions = new FeedOptions();
-        queryOptions.setMaxItemCount(10);
+        queryOptions.maxItemCount(10);
         queryOptions.setEnableCrossPartitionQuery(true);
 
         String collectionLink = String.format("/dbs/%s/colls/%s", databaseName, collectionName);
-        Observable<FeedResponse<Document>> queryObservable =
+        Flux<FeedResponse<Document>> queryObservable =
                 client.queryDocuments(collectionLink,
                         "SELECT * FROM Family WHERE Family.lastName != 'Andersen'", queryOptions);
 
         queryObservable
-                .observeOn(scheduler)
+                .subscribeOn(scheduler)
                 .subscribe(
                         page -> {
                             // we want to make sure heavyWork() doesn't block any of netty IO threads
@@ -328,7 +328,6 @@ public class Main {
                             System.out.println("Got a page of query result with " +
                                     page.getResults().size() + " document(s)"
                                     + " and request charge of " + page.getRequestCharge());
-
 
                             System.out.println("Document Ids " + page.getResults().stream().map(d -> d.getId())
                                     .collect(Collectors.toList()));
